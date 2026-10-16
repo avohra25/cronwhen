@@ -5,13 +5,26 @@
   "type": "module",
   "main": "src/index.js",
   "exports": "./src/index.js",
+  "bin": {
+    "cronwhen": "bin/cronwhen.js"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
   "scripts": {
     "test": "node --test"
   },
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["cron", "crontab", "schedule", "parser", "cli"],
+  "keywords": [
+    "cron",
+    "crontab",
+    "schedule",
+    "parser",
+    "cli"
+  ],
   "author": "avohra25",
   "license": "MIT"
 }
