@@ -1,0 +1,17 @@
+{
+  "name": "cronwhen",
+  "version": "0.1.0",
+  "description": "Zero-dependency cron expression parser, next/previous run calculator, and plain-English explainer.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": "./src/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["cron", "crontab", "schedule", "parser", "cli"],
+  "author": "avohra25",
+  "license": "MIT"
+}
