@@ -98,4 +98,3 @@ export function describe(expression) {
   const cron = typeof expression === 'string' ? parse(expression) : expression;
   return [timePart(cron), ...dayPart(cron)].join(', ');
 }
-
