@@ -42,6 +42,21 @@ function toNumber(token, spec) {
   return n;
 }
 
+/**
+ * A range whose start is after its end wraps around the field, so "FRI-MON"
+ * is Friday, Saturday, Sunday and Monday and "22-2" is 22:00 through 02:59.
+ * Steps keep counting across the wrap: "22-4/2" is 22, 0, 2 and 4.
+ */
+function addWrapped(lo, hi, step, spec, values) {
+  // Day-of-week cycles through 0-6; 7 is only an alias for Sunday.
+  const max = spec.name === 'dayOfWeek' ? 6 : spec.max;
+  const size = max - spec.min + 1;
+  const length = hi - lo + size + 1;
+  for (let i = 0; i < length; i += step) {
+    values.add(((lo - spec.min + i) % size) + spec.min);
+  }
+}
+
 function parsePart(part, spec, values) {
   if (part === '') throw new CronSyntaxError('empty list item', spec.name);
   const [rangeText, stepText, extra] = part.split('/');
@@ -65,7 +80,11 @@ function parsePart(part, spec, values) {
     if (bounds.length !== 2) throw new CronSyntaxError(`invalid range "${rangeText}"`, spec.name);
     lo = toNumber(bounds[0], spec);
     hi = toNumber(bounds[1], spec);
-    if (lo > hi) throw new CronSyntaxError(`range ${rangeText} is backwards`, spec.name);
+    if (spec.name === 'dayOfWeek' && lo === 7) lo = 0;
+    if (lo > hi) {
+      addWrapped(lo, hi, step, spec, values);
+      return;
+    }
   } else {
     lo = toNumber(rangeText, spec);
     // "5/15" means "starting at 5, every 15" up to the field maximum.

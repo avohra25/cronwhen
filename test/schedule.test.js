@@ -93,3 +93,22 @@ test('argument validation', () => {
   assert.throws(() => runs('* * * * *', -1), RangeError);
   assert.throws(() => nextRun('* * * * *', { from: 'not a date' }), TypeError);
 });
+
+test('wrap-around ranges schedule across the boundary', () => {
+  // 2026-10-23 is a Friday; FRI-MON skips Tuesday through Thursday.
+  const r = runs('0 9 * * FRI-MON', 5, utc('2026-10-22T12:00:00Z')).map(iso);
+  assert.deepEqual(r, [
+    '2026-10-23T09:00:00.000Z',
+    '2026-10-24T09:00:00.000Z',
+    '2026-10-25T09:00:00.000Z',
+    '2026-10-26T09:00:00.000Z',
+    '2026-10-30T09:00:00.000Z',
+  ]);
+  const night = runs('0 23-1 * * *', 4, utc('2026-12-31T12:00:00Z')).map(iso);
+  assert.deepEqual(night, [
+    '2026-12-31T23:00:00.000Z',
+    '2027-01-01T00:00:00.000Z',
+    '2027-01-01T01:00:00.000Z',
+    '2027-01-01T23:00:00.000Z',
+  ]);
+});

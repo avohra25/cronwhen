@@ -1,7 +1,7 @@
 {
   "name": "cronwhen",
-  "version": "0.1.0",
-  "description": "Zero-dependency cron expression parser, next/previous run calculator, and plain-English explainer.",
+  "version": "0.2.0",
+  "description": "Zero-dependency cron expression parser (with Quartz-style L, W and # extensions), next/previous run calculator, and plain-English explainer.",
   "type": "module",
   "main": "src/index.js",
   "exports": "./src/index.js",

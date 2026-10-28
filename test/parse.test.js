@@ -55,7 +55,7 @@ test('rejects malformed expressions with field names', () => {
     ['* * * 13 *', /month/],
     ['* * * * 8', /dayOfWeek/],
     ['*/0 * * * *', /invalid step/],
-    ['5-1 * * * *', /backwards/],
+    ['1-2-3 * * * *', /invalid range/],
     ['1,,2 * * * *', /empty list item/],
     ['a * * * *', /invalid value "a"/],
     ['@fortnightly', /unknown macro/],
@@ -63,4 +63,15 @@ test('rejects malformed expressions with field names', () => {
   for (const [expr, pattern] of cases) {
     assert.throws(() => parse(expr), (err) => err instanceof CronSyntaxError && pattern.test(err.message), expr);
   }
+});
+
+test('ranges that run past the end of a field wrap around', () => {
+  assert.deepEqual(sorted(parse('0 0 * * FRI-MON').dayOfWeek), [0, 1, 5, 6]);
+  assert.deepEqual(sorted(parse('0 0 * * 6-1').dayOfWeek), [0, 1, 6]);
+  assert.deepEqual(sorted(parse('0 0 * * 7-2').dayOfWeek), [0, 1, 2]);
+  assert.deepEqual(sorted(parse('0 22-2 * * *').hour), [0, 1, 2, 22, 23]);
+  assert.deepEqual(sorted(parse('0 22-4/2 * * *').hour), [0, 2, 4, 22]);
+  assert.deepEqual(sorted(parse('0 0 28-3 * *').dayOfMonth), [1, 2, 3, 28, 29, 30, 31]);
+  assert.deepEqual(sorted(parse('0 0 1 NOV-FEB *').month), [1, 2, 11, 12]);
+  assert.deepEqual(sorted(parse('50-10/5 * * * *').minute), [0, 5, 10, 50, 55]);
 });

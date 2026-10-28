@@ -18,6 +18,7 @@ Next runs:
 
 - Full five-field syntax: `*`, lists (`1,15`), ranges (`9-17`), steps (`*/15`,
   `9-17/2`, `5/20`), month and weekday names (`JAN`, `mon-fri`), and `7` as Sunday.
+- Wrap-around ranges such as `FRI-MON`, `22-2` (late night) and `NOV-FEB`.
 - Macros: `@yearly`, `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight`, `@hourly`.
 - Next and previous run times, in UTC or the host's local time zone.
 - Vixie cron day semantics: when both day-of-month and day-of-week are
@@ -160,10 +161,21 @@ change never fires, and a repeated hour in the fall fires once.
 A brute-force test cross-checks `nextRun` and `prevRun` against `matches()`
 minute by minute over a six-week window.
 
+## Wrap-around ranges
+
+A range whose start comes after its end wraps past the end of the field
+instead of being an error. `0 9 * * FRI-MON` runs Friday, Saturday, Sunday and
+Monday; `*/15 22-2 * * *` runs every 15 minutes from 22:00 to 02:45; and
+`0 0 1 NOV-FEB *` runs on the 1st of November through February. Steps keep
+counting across the wrap, so `0 22-4/2 * * *` fires at 22:00, 00:00, 02:00
+and 04:00. `describe()` keeps such ranges together ("on Friday through
+Monday") rather than splitting them at the end of the week.
+
 ## Not supported
 
-Non-standard extensions such as seconds and year fields, and wrap-around ranges like `FRI-MON`. They are rejected with a syntax error
-rather than silently misread.
+Six- and seven-field expressions (seconds and year fields) and a bare `L` in
+the day-of-week field. They are rejected with a syntax error rather than
+silently misread.
 
 ## License
 

@@ -19,26 +19,41 @@ function joinList(items) {
   return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }
 
-/** Collapse sorted numbers into runs: [1,2,3,5] -> [[1,3],[5,5]]. */
-function runsOf(values) {
+/**
+ * Collapse sorted numbers into runs: [1,2,3,5] -> [[1,3],[5,5]]. With a
+ * `cycle` ({ min, max }), a run touching the top of the cycle joins one
+ * starting at the bottom, so weekdays [0,1,5,6] become [[5,1]] (Fri-Mon).
+ */
+function runsOf(values, cycle) {
   const out = [];
   for (const v of values) {
     const last = out.at(-1);
     if (last && v === last[1] + 1) last[1] = v;
     else out.push([v, v]);
   }
+  if (cycle && out.length > 1 && out[0][0] === cycle.min && out.at(-1)[1] === cycle.max) {
+    const first = out.shift();
+    const last = out.pop();
+    out.unshift([last[0], first[1]]);
+  }
   return out;
 }
 
-function listWithRanges(values, label) {
+function listWithRanges(values, label, cycle) {
+  const size = cycle ? cycle.max - cycle.min + 1 : 0;
   return joinList(
-    runsOf(values).map(([a, b]) => {
+    runsOf(values, cycle).map(([a, b]) => {
       if (a === b) return label(a);
-      if (b === a + 1) return `${label(a)} and ${label(b)}`;
+      const span = b > a ? b - a : b - a + size;
+      if (span === 1) return `${label(a)} and ${label(b)}`;
       return `${label(a)} through ${label(b)}`;
     }),
   );
 }
+
+const HOURS = { min: 0, max: 23 };
+const WEEK = { min: 0, max: 6 };
+const YEAR = { min: 1, max: 12 };
 
 const stepOf = (text) => /^\*\/(\d+)$/.exec(text)?.[1];
 
@@ -50,8 +65,8 @@ function timePart(cron) {
   if (minText === '*' && hourText === '*') return 'Every minute';
   const minStep = stepOf(minText);
   if (minStep && hourText === '*') return `Every ${minStep} minutes`;
-  if (minText === '*') return `Every minute during ${listWithRanges(hours, (h) => pad(h) + ':00')}`;
-  if (minStep) return `Every ${minStep} minutes during ${listWithRanges(hours, (h) => pad(h) + ':00')}`;
+  if (minText === '*') return `Every minute during ${listWithRanges(hours, (h) => pad(h) + ':00', HOURS)}`;
+  if (minStep) return `Every ${minStep} minutes during ${listWithRanges(hours, (h) => pad(h) + ':00', HOURS)}`;
 
   if (hourText === '*') {
     return `At ${minutes.length > 1 ? 'minutes' : 'minute'} ${joinList(minutes.map(String))} past every hour`;
@@ -65,7 +80,7 @@ function timePart(cron) {
     for (const h of hours) for (const m of minutes) times.push(`${pad(h)}:${pad(m)}`);
     return `At ${joinList(times)}`;
   }
-  return `At ${minutes.length > 1 ? 'minutes' : 'minute'} ${joinList(minutes.map(String))} past ${listWithRanges(hours, (h) => pad(h) + ':00')}`;
+  return `At ${minutes.length > 1 ? 'minutes' : 'minute'} ${joinList(minutes.map(String))} past ${listWithRanges(hours, (h) => pad(h) + ':00', HOURS)}`;
 }
 
 function dayOfMonthRule(rule) {
@@ -95,7 +110,7 @@ const NTH = ['first', 'second', 'third', 'fourth', 'fifth'];
 function dayOfWeekPhrase(cron) {
   const items = [];
   const days = sorted(cron.dayOfWeek);
-  if (days.length) items.push(listWithRanges(days, (d) => DAYS[d]));
+  if (days.length) items.push(listWithRanges(days, (d) => DAYS[d], WEEK));
   for (const rule of cron.dayOfWeekRules ?? []) {
     const which = rule.kind === 'nth' ? NTH[rule.n - 1] : 'last';
     items.push(`the ${which} ${DAYS[rule.weekday]}`);
@@ -122,7 +137,7 @@ function dayPart(cron) {
 
   if (monText !== '*') {
     const monStep = stepOf(monText);
-    parts.push(monStep ? `every ${monStep} months` : `in ${listWithRanges(sorted(cron.month), (m) => MONTHS[m - 1])}`);
+    parts.push(monStep ? `every ${monStep} months` : `in ${listWithRanges(sorted(cron.month), (m) => MONTHS[m - 1], YEAR)}`);
   }
   return parts;
 }
