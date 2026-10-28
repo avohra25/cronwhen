@@ -68,16 +68,39 @@ function timePart(cron) {
   return `At ${minutes.length > 1 ? 'minutes' : 'minute'} ${joinList(minutes.map(String))} past ${listWithRanges(hours, (h) => pad(h) + ':00')}`;
 }
 
+function dayOfMonthRule(rule) {
+  switch (rule.kind) {
+    case 'last':
+      // L-1 is the second-to-last day, L-3 the fourth-to-last, and so on.
+      return rule.offset === 0 ? 'the last day' : `the ${ordinal(rule.offset + 1)}-to-last day`;
+    case 'lastWeekday':
+      return 'the last weekday';
+    case 'nearestWeekday':
+      return `the weekday nearest the ${ordinal(rule.day)}`;
+    default:
+      return rule.kind;
+  }
+}
+
+function dayOfMonthPhrase(cron) {
+  const items = [];
+  const days = sorted(cron.dayOfMonth);
+  if (days.length) items.push(`the ${listWithRanges(days, ordinal)}`);
+  for (const rule of cron.dayOfMonthRules ?? []) items.push(dayOfMonthRule(rule));
+  return `on ${joinList(items)}`;
+}
+
 function dayPart(cron) {
   const [, , domText, monText, dowText] = cron.fields;
   const parts = [];
 
   const domStep = stepOf(domText);
-  const dom = domStep ? `every ${domStep} days` : `on the ${listWithRanges(sorted(cron.dayOfMonth), ordinal)}`;
+  const hasRules = (cron.dayOfMonthRules ?? []).length > 0;
+  const dom = domStep ? `every ${domStep} days` : dayOfMonthPhrase(cron);
   const dow = `on ${listWithRanges(sorted(cron.dayOfWeek), (d) => DAYS[d])}`;
 
   if (cron.dayOfMonthRestricted && cron.dayOfWeekRestricted) {
-    parts.push(`${dom} or ${dow}`);
+    parts.push(`${dom}${hasRules ? ' of the month' : ''} or ${dow}`);
   } else {
     if (domText !== '*') parts.push(domStep ? dom : `${dom} of the month`);
     if (dowText !== '*') parts.push(dow);

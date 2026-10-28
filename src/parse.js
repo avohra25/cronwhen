@@ -75,18 +75,42 @@ function parsePart(part, spec, values) {
   for (let v = lo; v <= hi; v += step) values.add(v);
 }
 
+// Quartz-style day-of-month extensions: "L" (last day), "L-3" (three days
+// before the last day), "LW" (last weekday) and "15W" (weekday nearest the 15th).
+function parseDayOfMonthRule(part, spec) {
+  const upper = part.toUpperCase();
+  if (upper === 'LW') return { kind: 'lastWeekday' };
+  const last = /^L(?:-(\d+))?$/.exec(upper);
+  if (last) {
+    const offset = last[1] === undefined ? 0 : Number(last[1]);
+    if (offset > 30) throw new CronSyntaxError(`"${part}" offset must be 0-30`, spec.name);
+    return { kind: 'last', offset };
+  }
+  const near = /^(\d+)W$/.exec(upper);
+  if (near) return { kind: 'nearestWeekday', day: toNumber(near[1], spec) };
+  if (/[LW]/.test(upper)) throw new CronSyntaxError(`invalid value "${part}"`, spec.name);
+  return null;
+}
+
 function parseField(text, spec) {
   const values = new Set();
-  for (const part of text.split(',')) parsePart(part, spec, values);
+  const rules = [];
+  for (const part of text.split(',')) {
+    const rule = spec.name === 'dayOfMonth' && part !== '' ? parseDayOfMonthRule(part, spec) : null;
+    if (rule) rules.push(rule);
+    else parsePart(part, spec, values);
+  }
   if (spec.name === 'dayOfWeek' && values.has(7)) {
     values.delete(7);
     values.add(0); // 7 is an alias for Sunday
   }
-  return values;
+  return { values, rules };
 }
 
 /**
- * Parse a cron expression into sets of allowed values per field.
+ * Parse a cron expression into sets of allowed values per field. Day-of-month
+ * extensions that depend on the month ("L", "15W", ...) are returned as
+ * `dayOfMonthRules` and evaluated per date by the scheduler.
  * @param {string} expression e.g. "*\/15 9-17 * * MON-FRI" or "@daily"
  */
 export function parse(expression) {
@@ -101,9 +125,14 @@ export function parse(expression) {
   if (parts.length !== 5) {
     throw new CronSyntaxError(`expected 5 fields, got ${parts.length}`);
   }
+  // "?" means "no specific value" in the day fields (Quartz); treat it as "*".
+  if (parts[2] === '?') parts[2] = '*';
+  if (parts[4] === '?') parts[4] = '*';
   const result = { source: expression.trim(), fields: parts };
   FIELDS.forEach((spec, i) => {
-    result[spec.name] = parseField(parts[i], spec);
+    const { values, rules } = parseField(parts[i], spec);
+    result[spec.name] = values;
+    if (spec.name === 'dayOfMonth') result.dayOfMonthRules = rules;
   });
   // Vixie cron: if either day field starts with "*" the two are ANDed, otherwise ORed.
   result.dayOfMonthRestricted = !parts[2].startsWith('*');

@@ -23,6 +23,9 @@ Next runs:
 - Vixie cron day semantics: when both day-of-month and day-of-week are
   restricted, a day matches if **either** does (`0 0 13 * FRI` is "the 13th or
   any Friday").
+- Quartz-style day-of-month extensions: `L` (last day), `L-3` (three days
+  before the last day), `LW` (last weekday) and `15W` (weekday nearest the
+  15th), plus `?` as "no specific value" in either day field.
 - Impossible schedules such as `0 0 30 2 *` return `null` instead of hanging.
 - Clear errors that name the offending field (`minute: 61 is outside 0-59`).
 - No dependencies; tests use the built-in `node:test` runner.
@@ -98,6 +101,25 @@ you can parse once and reuse it. Options: `from` (anything `new Date()`
 accepts, default now), `utc` (default `false`), and `maxYears` (search window,
 default 8 years, long enough to find leap-day schedules).
 
+## Day-of-month extensions
+
+These come from Quartz and other schedulers and can be mixed with plain values
+in a list, as in `1,15,L`.
+
+| Token | Meaning | Example |
+|---|---|---|
+| `L` | Last day of the month (28th to 31st) | `0 0 L * *` |
+| `L-n` | `n` days before the last day (`n` is 0 to 30) | `0 0 L-2 * *` fires on Jan 29, Feb 26 (2027) |
+| `LW` | Last Monday-to-Friday day of the month | `0 17 LW * *` for month-end close |
+| `nW` | Weekday nearest the `n`th, never leaving the month | `0 9 15W * *` fires on Fri Aug 14, 2026 because the 15th is a Saturday |
+| `?` | Same as `*`, accepted in the day fields for Quartz compatibility | `0 12 ? * MON` |
+
+`1W` on a month that starts on Saturday moves forward to Monday the 3rd, and
+`31W` on a Sunday moves back to Friday the 29th. A `W` day that the month
+doesn't have (such as `31W` in April) doesn't fire that month. The Vixie
+either-day rule still applies, so `0 0 L * FRI` means "the last day of the
+month, or any Friday".
+
 ## How the search works
 
 Rather than testing every minute, the search checks fields from coarsest to
@@ -115,8 +137,7 @@ minute by minute over a six-week window.
 
 ## Not supported
 
-Non-standard extensions such as seconds fields, `L`, `W`, `#`, `?`, and
-wrap-around ranges like `FRI-MON`. They are rejected with a syntax error
+Non-standard extensions such as seconds fields, `#`, and wrap-around ranges like `FRI-MON`. They are rejected with a syntax error
 rather than silently misread.
 
 ## License
