@@ -1,6 +1,6 @@
 // Next / previous occurrence search over a parsed cron expression.
 import { parse } from './parse.js';
-import { dayOfMonthRuleMatches } from './calendar.js';
+import { dayOfMonthRuleMatches, dayOfWeekRuleMatches } from './calendar.js';
 
 const MINUTE = 60_000;
 const DEFAULT_SEARCH_YEARS = 8; // enough to find Feb 29 schedules
@@ -29,11 +29,15 @@ function clock(utc) {
 }
 
 function dayMatches(cron, c, d) {
+  const year = c.year(d);
+  const month = c.month(d);
   const day = c.day(d);
   const dom =
     cron.dayOfMonth.has(day) ||
-    (cron.dayOfMonthRules ?? []).some((rule) => dayOfMonthRuleMatches(rule, c.year(d), c.month(d), day));
-  const dow = cron.dayOfWeek.has(c.weekday(d));
+    (cron.dayOfMonthRules ?? []).some((rule) => dayOfMonthRuleMatches(rule, year, month, day));
+  const dow =
+    cron.dayOfWeek.has(c.weekday(d)) ||
+    (cron.dayOfWeekRules ?? []).some((rule) => dayOfWeekRuleMatches(rule, year, month, day));
   if (cron.dayOfMonthRestricted && cron.dayOfWeekRestricted) return dom || dow;
   return dom && dow;
 }

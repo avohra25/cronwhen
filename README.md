@@ -26,6 +26,8 @@ Next runs:
 - Quartz-style day-of-month extensions: `L` (last day), `L-3` (three days
   before the last day), `LW` (last weekday) and `15W` (weekday nearest the
   15th), plus `?` as "no specific value" in either day field.
+- Weekday-of-month rules: `FRI#3` (third Friday) and `5L` or `FRIL` (last
+  Friday of the month).
 - Impossible schedules such as `0 0 30 2 *` return `null` instead of hanging.
 - Clear errors that name the offending field (`minute: 61 is outside 0-59`).
 - No dependencies; tests use the built-in `node:test` runner.
@@ -120,6 +122,29 @@ doesn't have (such as `31W` in April) doesn't fire that month. The Vixie
 either-day rule still applies, so `0 0 L * FRI` means "the last day of the
 month, or any Friday".
 
+## Day-of-week extensions
+
+| Token | Meaning | Example |
+|---|---|---|
+| `D#n` | The `n`th weekday `D` of the month (`n` is 1 to 5) | `0 10 * * FRI#3` fires Oct 16, Nov 20, Dec 18 (2026) |
+| `DL` | The last weekday `D` of the month | `0 18 * * 5L` or `0 18 * * FRIL` |
+
+`D` is a number (0 to 7) or a three-letter name. These rules mix freely with
+plain weekdays, so `0 9 * * MON,FRIL` runs every Monday and on the last Friday.
+`#5` only fires in months that actually have a fifth such weekday. A bare `L`
+in the day-of-week field is rejected because schedulers disagree on what it
+means.
+
+```console
+$ cronwhen -u -n 3 --from 2026-10-01T00:00:00Z "0 10 * * FRI#3"
+At 10:00, on the third Friday of the month
+
+Next runs:
+  2026-10-16T10:00:00Z
+  2026-11-20T10:00:00Z
+  2026-12-18T10:00:00Z
+```
+
 ## How the search works
 
 Rather than testing every minute, the search checks fields from coarsest to
@@ -137,7 +162,7 @@ minute by minute over a six-week window.
 
 ## Not supported
 
-Non-standard extensions such as seconds fields, `#`, and wrap-around ranges like `FRI-MON`. They are rejected with a syntax error
+Non-standard extensions such as seconds and year fields, and wrap-around ranges like `FRI-MON`. They are rejected with a syntax error
 rather than silently misread.
 
 ## License

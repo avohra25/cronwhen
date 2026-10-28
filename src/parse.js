@@ -92,11 +92,36 @@ function parseDayOfMonthRule(part, spec) {
   return null;
 }
 
+// Day-of-week extensions: "FRI#3" (third Friday of the month) and "5L" or
+// "FRIL" (last Friday of the month).
+function parseDayOfWeekRule(part, spec) {
+  const nth = /^([A-Z0-9]+)#(\d+)$/i.exec(part);
+  if (nth) {
+    const n = Number(nth[2]);
+    if (n < 1 || n > 5) throw new CronSyntaxError(`"#${nth[2]}" must be 1-5`, spec.name);
+    return { kind: 'nth', weekday: toNumber(nth[1], spec) % 7, n };
+  }
+  const last = /^([A-Z]{3}|\d+)L$/i.exec(part);
+  if (last) return { kind: 'lastOf', weekday: toNumber(last[1], spec) % 7 };
+  if (part.toUpperCase() === 'L') {
+    throw new CronSyntaxError('"L" needs a weekday, e.g. "5L" or "FRIL" for the last Friday', spec.name);
+  }
+  if (part.includes('#')) throw new CronSyntaxError(`invalid value "${part}"`, spec.name);
+  return null;
+}
+
+function parseRule(part, spec) {
+  if (part === '') return null;
+  if (spec.name === 'dayOfMonth') return parseDayOfMonthRule(part, spec);
+  if (spec.name === 'dayOfWeek') return parseDayOfWeekRule(part, spec);
+  return null;
+}
+
 function parseField(text, spec) {
   const values = new Set();
   const rules = [];
   for (const part of text.split(',')) {
-    const rule = spec.name === 'dayOfMonth' && part !== '' ? parseDayOfMonthRule(part, spec) : null;
+    const rule = parseRule(part, spec);
     if (rule) rules.push(rule);
     else parsePart(part, spec, values);
   }
@@ -109,8 +134,9 @@ function parseField(text, spec) {
 
 /**
  * Parse a cron expression into sets of allowed values per field. Day-of-month
- * extensions that depend on the month ("L", "15W", ...) are returned as
- * `dayOfMonthRules` and evaluated per date by the scheduler.
+ * and day-of-week extensions that depend on the month ("L", "15W", "FRI#2",
+ * "5L") are returned as `dayOfMonthRules` and `dayOfWeekRules` and evaluated
+ * per date by the scheduler.
  * @param {string} expression e.g. "*\/15 9-17 * * MON-FRI" or "@daily"
  */
 export function parse(expression) {
@@ -133,6 +159,7 @@ export function parse(expression) {
     const { values, rules } = parseField(parts[i], spec);
     result[spec.name] = values;
     if (spec.name === 'dayOfMonth') result.dayOfMonthRules = rules;
+    if (spec.name === 'dayOfWeek') result.dayOfWeekRules = rules;
   });
   // Vixie cron: if either day field starts with "*" the two are ANDed, otherwise ORed.
   result.dayOfMonthRestricted = !parts[2].startsWith('*');

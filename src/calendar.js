@@ -46,3 +46,16 @@ export function dayOfMonthRuleMatches(rule, year, month, day) {
       throw new Error(`unknown day-of-month rule ${rule.kind}`);
   }
 }
+
+/** True when `day` of `month` satisfies a day-of-week rule from parse(). */
+export function dayOfWeekRuleMatches(rule, year, month, day) {
+  if (weekdayOf(year, month, day) !== rule.weekday) return false;
+  switch (rule.kind) {
+    case 'nth':
+      return Math.ceil(day / 7) === rule.n;
+    case 'lastOf':
+      return day + 7 > daysInMonth(year, month);
+    default:
+      throw new Error(`unknown day-of-week rule ${rule.kind}`);
+  }
+}

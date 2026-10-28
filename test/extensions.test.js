@@ -119,3 +119,80 @@ test('describe() explains day-of-month rules', () => {
   assert.equal(describe('0 0 L * FRI'), 'At 00:00, on the last day of the month or on Friday');
   assert.equal(describe('0 12 ? * MON'), 'At 12:00, on Monday');
 });
+
+test('parses nth and last weekday-of-month rules', () => {
+  const c = parse('0 0 * * MON#1,5L,fril,0#5,7#2');
+  assert.equal(c.dayOfWeek.size, 0);
+  assert.deepEqual(c.dayOfWeekRules, [
+    { kind: 'nth', weekday: 1, n: 1 },
+    { kind: 'lastOf', weekday: 5 },
+    { kind: 'lastOf', weekday: 5 },
+    { kind: 'nth', weekday: 0, n: 5 },
+    { kind: 'nth', weekday: 0, n: 2 },
+  ]);
+  assert.deepEqual([...parse('0 0 * * 1-5,FRI#3').dayOfWeek].sort(), [1, 2, 3, 4, 5]);
+});
+
+test('rejects malformed day-of-week rules', () => {
+  const cases = [
+    ['0 0 * * FRI#0', /"#0" must be 1-5/],
+    ['0 0 * * FRI#6', /"#6" must be 1-5/],
+    ['0 0 * * 8#1', /dayOfWeek: 8 is outside 0-7/],
+    ['0 0 * * FOO#1', /invalid value "FOO"/],
+    ['0 0 * * L', /"L" needs a weekday/],
+    ['0 0 * * #2', /invalid value "#2"/],
+    ['0 0 * * 1#2/2', /invalid value/],
+    ['0 0 1#2 * *', /dayOfMonth: invalid value "1#2"/],
+  ];
+  for (const [expr, pattern] of cases) {
+    assert.throws(() => parse(expr), (err) => err instanceof CronSyntaxError && pattern.test(err.message), expr);
+  }
+});
+
+test('FRI#3 is the third Friday of each month', () => {
+  assert.deepEqual(days('0 10 * * FRI#3', 4, '2026-10-01T00:00:00Z'), ['2026-10-16', '2026-11-20', '2026-12-18', '2027-01-15']);
+});
+
+test('#5 only fires in months that have a fifth such weekday', () => {
+  // Fifth Thursdays from October 2026: Oct 29, Dec 31, Apr 29, Jul 29.
+  assert.deepEqual(days('0 0 * * THU#5', 4, '2026-10-01T00:00:00Z'), ['2026-10-29', '2026-12-31', '2027-04-29', '2027-07-29']);
+});
+
+test('5L is the last Friday of each month', () => {
+  assert.deepEqual(days('0 18 * * 5L', 4, '2026-10-01T00:00:00Z'), ['2026-10-30', '2026-11-27', '2026-12-25', '2027-01-29']);
+  assert.equal(prevRun('0 18 * * SUNL', utc('2026-11-01T00:00:00Z')).toISOString(), '2026-10-25T18:00:00.000Z');
+});
+
+test('weekday rules mix with plain weekdays and day-of-month values', () => {
+  // Every Monday, plus the last Friday of the month.
+  assert.deepEqual(days('0 9 * * MON,FRIL', 4, '2026-10-24T00:00:00Z'), ['2026-10-26', '2026-10-30', '2026-11-02', '2026-11-09']);
+  // The 1st of the month, or the second Tuesday (Vixie OR rule).
+  assert.deepEqual(days('0 0 1 * TUE#2', 4, '2026-10-02T00:00:00Z'), ['2026-10-13', '2026-11-01', '2026-11-10', '2026-12-01']);
+});
+
+test('weekday-rule schedules agree with matches() minute by minute', () => {
+  const exprs = ['0 */12 * * MON#2,FRIL', '45 23 L * 0#1', '0 0 * 1-6 WED#5'];
+  for (const expr of exprs) {
+    const cron = parse(expr);
+    const start = Date.UTC(2026, 0, 1);
+    const end = Date.UTC(2026, 5, 1);
+    const all = [];
+    for (let m = start + 60_000; m < end; m += 60_000) if (matches(cron, m, { utc: true })) all.push(m);
+    const back = [];
+    let t = prevRun(cron, { utc: true, from: end });
+    while (t && t.getTime() > start) {
+      back.unshift(t.getTime());
+      t = prevRun(cron, { utc: true, from: t });
+    }
+    assert.deepEqual(back, all, expr);
+    assert.ok(all.length > 0, expr);
+  }
+});
+
+test('describe() explains weekday-of-month rules', () => {
+  assert.equal(describe('0 10 * * FRI#3'), 'At 10:00, on the third Friday of the month');
+  assert.equal(describe('0 18 * * 5L'), 'At 18:00, on the last Friday of the month');
+  assert.equal(describe('0 9 * * MON,FRIL'), 'At 09:00, on Monday and the last Friday of the month');
+  assert.equal(describe('0 0 1 * TUE#2'), 'At 00:00, on the 1st or on the second Tuesday of the month');
+  assert.equal(describe('0 0 * 1-6 WED#5'), 'At 00:00, on the fifth Wednesday of the month, in January through June');
+});

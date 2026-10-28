@@ -90,6 +90,20 @@ function dayOfMonthPhrase(cron) {
   return `on ${joinList(items)}`;
 }
 
+const NTH = ['first', 'second', 'third', 'fourth', 'fifth'];
+
+function dayOfWeekPhrase(cron) {
+  const items = [];
+  const days = sorted(cron.dayOfWeek);
+  if (days.length) items.push(listWithRanges(days, (d) => DAYS[d]));
+  for (const rule of cron.dayOfWeekRules ?? []) {
+    const which = rule.kind === 'nth' ? NTH[rule.n - 1] : 'last';
+    items.push(`the ${which} ${DAYS[rule.weekday]}`);
+  }
+  const suffix = (cron.dayOfWeekRules ?? []).length ? ' of the month' : '';
+  return `on ${joinList(items)}${suffix}`;
+}
+
 function dayPart(cron) {
   const [, , domText, monText, dowText] = cron.fields;
   const parts = [];
@@ -97,7 +111,7 @@ function dayPart(cron) {
   const domStep = stepOf(domText);
   const hasRules = (cron.dayOfMonthRules ?? []).length > 0;
   const dom = domStep ? `every ${domStep} days` : dayOfMonthPhrase(cron);
-  const dow = `on ${listWithRanges(sorted(cron.dayOfWeek), (d) => DAYS[d])}`;
+  const dow = dayOfWeekPhrase(cron);
 
   if (cron.dayOfMonthRestricted && cron.dayOfWeekRestricted) {
     parts.push(`${dom}${hasRules ? ' of the month' : ''} or ${dow}`);
